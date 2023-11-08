@@ -25,7 +25,7 @@ namespace SMBLibrary.Client
         public static readonly uint ClientMaxTransactSize = 1048576;
         public static readonly uint ClientMaxReadSize = 1048576;
         public static readonly uint ClientMaxWriteSize = 1048576;
-        private static readonly ushort DesiredCredits = 16;
+        private static readonly ushort DefaultDesiredCredits = 16;
         public static readonly int DefaultResponseTimeoutInMilliseconds = 5000;
 
         private string m_serverName;
@@ -34,6 +34,7 @@ namespace SMBLibrary.Client
         private bool m_isLoggedIn;
         private Socket m_clientSocket;
         private int m_responseTimeoutInMilliseconds;
+        private ushort m_desiredCredits;
 
         private object m_incomingQueueLock = new object();
         private List<SMB2Command> m_incomingQueue = new List<SMB2Command>();
@@ -42,7 +43,7 @@ namespace SMBLibrary.Client
         private SessionPacket m_sessionResponsePacket;
         private EventWaitHandle m_sessionResponseEventHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
 
-        private uint m_messageID = 0;
+        private long m_messageID = 0;
         private SMB2Dialect m_dialect;
         private bool m_signingRequired;
         private byte[] m_signingKey;
@@ -67,6 +68,11 @@ namespace SMBLibrary.Client
         /// </param>
         public bool Connect(string serverName, SMBTransportType transport)
         {
+            return Connect(serverName, transport, DefaultResponseTimeoutInMilliseconds, DefaultDesiredCredits);
+        }
+
+        public bool Connect(string serverName, SMBTransportType transport, int responseTimeoutInMilliseconds, ushort desiredCredits)
+        {
             m_serverName = serverName;
             IPAddress[] hostAddresses = Dns.GetHostAddresses(serverName);
             if (hostAddresses.Length == 0)
@@ -74,16 +80,21 @@ namespace SMBLibrary.Client
                 throw new Exception(String.Format("Cannot resolve host name {0} to an IP address", serverName));
             }
             IPAddress serverAddress = IPAddressHelper.SelectAddressPreferIPv4(hostAddresses);
-            return Connect(serverAddress, transport);
+            return Connect(serverAddress, transport, responseTimeoutInMilliseconds, desiredCredits);
         }
 
         public bool Connect(IPAddress serverAddress, SMBTransportType transport)
         {
-            int port = (transport == SMBTransportType.DirectTCPTransport ? DirectTCPPort : NetBiosOverTCPPort);
-            return Connect(serverAddress, transport, port, DefaultResponseTimeoutInMilliseconds);
+            return Connect(serverAddress, transport, DefaultResponseTimeoutInMilliseconds, DefaultDesiredCredits);
         }
 
-        private bool Connect(IPAddress serverAddress, SMBTransportType transport, int port, int responseTimeoutInMilliseconds)
+        public bool Connect(IPAddress serverAddress, SMBTransportType transport, int responseTimeoutInMilliseconds, ushort desiredCredits)
+        {
+            int port = (transport == SMBTransportType.DirectTCPTransport ? DirectTCPPort : NetBiosOverTCPPort);
+            return Connect(serverAddress, transport, port, responseTimeoutInMilliseconds, desiredCredits);
+        }
+
+        private bool Connect(IPAddress serverAddress, SMBTransportType transport, int port, int responseTimeoutInMilliseconds, ushort desiredCredits)
         {
             if (m_serverName == null)
             {
@@ -94,6 +105,7 @@ namespace SMBLibrary.Client
             if (!m_isConnected)
             {
                 m_responseTimeoutInMilliseconds = responseTimeoutInMilliseconds;
+                m_desiredCredits = desiredCredits;
                 if (!ConnectSocket(serverAddress, port))
                 {
                     return false;
@@ -520,7 +532,7 @@ namespace SMBLibrary.Client
                 }
                 m_incomingQueueEventHandle.WaitOne(100);
             }
-            return null;
+            throw new TimeoutException($"Timed out while waiting {m_responseTimeoutInMilliseconds}ms for a response");
         }
 
         internal SessionPacket WaitForSessionResponsePacket()
@@ -570,18 +582,21 @@ namespace SMBLibrary.Client
 
                 if (m_availableCredits < request.Header.CreditCharge)
                 {
-                    throw new Exception("Not enough credits");
+                    // throw new Exception("Not enough credits");
+                    // try ignoring the limit and requesting more
+                    m_availableCredits = 0;
+                }
+                else
+                {
+                    m_availableCredits -= request.Header.CreditCharge;
                 }
 
-                m_availableCredits -= request.Header.CreditCharge;
-
-                if (m_availableCredits < DesiredCredits)
+                if (m_availableCredits < m_desiredCredits)
                 {
-                    request.Header.Credits += (ushort)(DesiredCredits - m_availableCredits);
+                    request.Header.Credits += (ushort)(m_desiredCredits - m_availableCredits);
                 }
             }
 
-            request.Header.MessageID = m_messageID;
             request.Header.SessionID = m_sessionID;
             // [MS-SMB2] If the client encrypts the message [..] then the client MUST set the Signature field of the SMB2 header to zero
             if (m_signingRequired && !encryptData)
@@ -597,15 +612,15 @@ namespace SMBLibrary.Client
                     request.Header.Signature = ByteReader.ReadBytes(signature, 0, 16);
                 }
             }
+
+            long incrementAmount =
+                m_dialect == SMB2Dialect.SMB202 || m_transport == SMBTransportType.NetBiosOverTCP
+                ? 1
+                : request.Header.CreditCharge;
+
+            request.Header.MessageID = (ulong)(Interlocked.Add(ref m_messageID, incrementAmount) - incrementAmount);
+
             TrySendCommand(m_clientSocket, request, encryptData ? m_encryptionKey : null);
-            if (m_dialect == SMB2Dialect.SMB202 || m_transport == SMBTransportType.NetBiosOverTCP)
-            {
-                m_messageID++;
-            }
-            else
-            {
-                m_messageID += request.Header.CreditCharge;
-            }
         }
 
         public uint MaxTransactSize
