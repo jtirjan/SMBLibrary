@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <AssemblyName>Utilities</AssemblyName>
+    <AssemblyName>SMBLibrary.Utilities</AssemblyName>
     <RootNamespace>Utilities</RootNamespace>
   </PropertyGroup>
 

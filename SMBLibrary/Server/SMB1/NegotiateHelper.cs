@@ -44,7 +44,9 @@ namespace SMBLibrary.Server.SMB1
                                     Capabilities.LargeRead |
                                     Capabilities.LargeWrite;
             response.SystemTime = DateTime.UtcNow;
+#pragma warning disable CS0618 // Type or member is obsolete
             response.ServerTimeZone = (short)-TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now).TotalMinutes;
+#pragma warning restore CS0618 // Type or member is obsolete
             NegotiateMessage negotiateMessage = CreateNegotiateMessage();
             ChallengeMessage challengeMessage;
             NTStatus status = securityProvider.GetNTLMChallengeMessage(out state.AuthenticationContext, negotiateMessage, out challengeMessage);
@@ -78,7 +80,9 @@ namespace SMBLibrary.Server.SMB1
                                     Capabilities.LargeWrite |
                                     Capabilities.ExtendedSecurity;
             response.SystemTime = DateTime.UtcNow;
+#pragma warning disable CS0618 // Type or member is obsolete
             response.ServerTimeZone = (short)-TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now).TotalMinutes;
+#pragma warning restore CS0618 // Type or member is obsolete
             response.ServerGuid = serverGuid;
 
             return response;

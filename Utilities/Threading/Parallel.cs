@@ -43,7 +43,9 @@ namespace Utilities
         /// Bigger chunk size should reduce lock waiting time and thus
         /// increase paralelism.
         /// </param>
+#pragma warning disable CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
         public static void For(int fromInclusive, int toExclusive, int chunkSize, ForDelegate forDelegate)
+#pragma warning restore CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
         {
             int threadCount = Environment.ProcessorCount;
             For(fromInclusive, toExclusive, chunkSize, threadCount, forDelegate);
@@ -60,7 +62,13 @@ namespace Utilities
         /// increase paralelism.
         /// </param>
         /// <param name="threadCount">number of process() threads</param>
+#pragma warning disable CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
+#pragma warning disable CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
+#pragma warning disable CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
         public static void For(int fromInclusive, int toExclusive, int chunkSize, int threadCount, ForDelegate forDelegate)
+#pragma warning restore CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
+#pragma warning restore CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
+#pragma warning restore CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
         {
             int index = fromInclusive - chunkSize;
             // locker object shared by all the process() delegates
@@ -84,7 +92,9 @@ namespace Utilities
                     //  so the real order of items will be out-of-order)
                     for (int i = chunkStart; i < chunkStart + chunkSize; i++)
                     {
+#pragma warning disable IDE0011 // Add braces
                         if (i >= toExclusive) return;
+#pragma warning restore IDE0011 // Add braces
                         forDelegate(i);
                     }
                 }
