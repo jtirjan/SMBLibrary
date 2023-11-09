@@ -37,7 +37,7 @@ namespace Utilities
         }
 
         /// <summary>
-        /// Searches for the specified object and returns the zero-based index of the first occurrence within the entire SortedList<T>
+        /// Searches for the specified object and returns the zero-based index of the first occurrence within the entire SortedList
         /// </summary>
         public int IndexOf(T item)
         {
